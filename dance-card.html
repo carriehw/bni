@@ -34,7 +34,9 @@ h3{font-size:18px;margin:0}
 .sectionHead .small{font-size:13px;color:var(--muted)}
 .empty{padding:24px 16px;border:1px dashed #d8d8d8;border-radius:18px;color:var(--muted);text-align:center;background:#fafafa}
 .cardList{display:flex;flex-direction:column;gap:10px}
+.recordWrap{display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:8px;align-items:stretch}
 .record{width:100%;border:1px solid var(--line);border-radius:18px;background:#fff;padding:15px 16px;text-align:left;display:flex;align-items:center;gap:12px}
+.deleteRecord{border:1px solid #f0d1d6;border-radius:16px;background:#fff7f8;color:#b4233c;font-size:20px;display:flex;align-items:center;justify-content:center;min-height:48px}
 .avatar{width:44px;height:44px;border-radius:14px;background:#f1f1f1;display:flex;align-items:center;justify-content:center;font-weight:900;color:#555;flex:none}
 .recordMain{min-width:0;flex:1}
 .recordName{font-size:17px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -190,6 +192,7 @@ body{background:#fff}.app{max-width:none!important;min-height:0!important;paddin
     <button class="secondary" type="button" id="editAnswersBtn">編輯答案</button>
     <button class="secondary" type="button" id="pdfBtn">儲存 PDF</button>
     <button class="primary" type="button" id="shareBtn">分享 Referral Card</button>
+    <button class="secondary danger" type="button" id="deleteCurrentBtn">刪除呢份記錄</button>
   </div>
 </section>
 
@@ -300,12 +303,28 @@ function renderHome(){
   var box=el("recordList");box.innerHTML="";
   if(!list.length){box.innerHTML='<div class="empty">仲未有 1-to-1 記錄。</div>';return}
   list.forEach(function(c){
-    var done=cardCompletion(c),b=document.createElement("button");
+    var done=cardCompletion(c),wrap=document.createElement("div"),b=document.createElement("button"),del=document.createElement("button");
+    wrap.className="recordWrap";
     b.type="button";b.className="record";
     b.innerHTML='<div class="avatar">'+initials(c.partner)+'</div><div class="recordMain"><div class="recordName">'+escapeHtml(c.partner||"未命名會面")+'</div><div class="recordMeta">'+formatDate(c.date)+(c.name?" · "+escapeHtml(c.name):"")+'</div></div><div class="badge '+(done===9?"done":"")+'">'+(done===9?"已完成":done+"/9")+'</div>';
     b.addEventListener("click",function(){state.currentId=c.id;if(done===9){renderComplete();show("complete")}else{step=Math.min(firstIncomplete()-1,8);renderConversation();show("conversation")}});
-    box.appendChild(b)
+    del.type="button";del.className="deleteRecord";del.setAttribute("aria-label","刪除 "+(c.partner||"呢份記錄"));del.textContent="⌫";
+    del.addEventListener("click",function(e){e.stopPropagation();deleteRecordById(c.id)});
+    wrap.appendChild(b);wrap.appendChild(del);box.appendChild(wrap)
   })
+}
+function deleteRecordById(id){
+  var card=state.cards.find(function(x){return x.id===id});
+  if(!card)return;
+  var name=card.partner||"呢份記錄";
+  if(!confirm("確定刪除「"+name+"」呢份 DANCE Card？\n\n刪除後無法復原。"))return;
+  state.cards=state.cards.filter(function(x){return x.id!==id});
+  if(!state.cards.length){
+    var fresh=blankCard();state.cards=[fresh];state.currentId=fresh.id
+  }else if(state.currentId===id){
+    state.currentId=state.cards[0].id
+  }
+  saveAll(false);renderHome();show("home")
 }
 function firstIncomplete(){for(var i=1;i<=9;i++)if(!questionHasContent(i))return i;return 9}
 function renderDots(){
@@ -486,6 +505,7 @@ el("nextBtn").addEventListener("click",function(){saveAll(false);if(step<8){step
 el("editAnswersBtn").addEventListener("click",function(){step=0;renderConversation();show("conversation")});
 el("pdfBtn").addEventListener("click",printPdf);
 el("shareBtn").addEventListener("click",shareCard);
+el("deleteCurrentBtn").addEventListener("click",function(){var c=current();if(c)deleteRecordById(c.id)});
 el("outputLang").addEventListener("change",renderPrint);
 ["profileName","profileChapter","profileClass"].forEach(function(id){el(id).addEventListener("input",function(){clearTimeout(saveTimer);saveTimer=setTimeout(saveProfile,250)})});
 el("backupBtn").addEventListener("click",downloadBackup);
