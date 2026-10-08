@@ -126,10 +126,12 @@ body{background:#fff}.app{max-width:none!important;min-height:0!important;paddin
   <div class="hero">
     <div class="eyebrow">New 1-to-1</div>
     <h2>今次同邊個傾？</h2>
-    <div class="sub">只需要填對方姓名同日期，就可以開始。</div>
+    <div class="sub">填低對方姓名、Chapter、專業領域同日期，就可以開始。</div>
   </div>
   <div class="formCard">
     <div class="field"><label for="newPartner">對方姓名</label><input id="newPartner" type="text" placeholder="例如：Walter"></div>
+    <div class="field"><label for="newPartnerChapter">對方 Chapter</label><input id="newPartnerChapter" type="text" placeholder="例如：BINGO"></div>
+    <div class="field"><label for="newPartnerProfession">專業領域</label><input id="newPartnerProfession" type="text" placeholder="例如：保險、室內設計、會計"></div>
     <div class="field"><label for="newDate">日期</label><input id="newDate" type="date"></div>
   </div>
   <div style="margin-top:16px"><button class="primary" id="beginBtn" type="button">開始 1-to-1 →</button></div>
@@ -245,7 +247,7 @@ function el(id){return document.getElementById(id)}
 function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function uid(){return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function current(){return state.cards.find(function(c){return c.id===state.currentId})||null}
-function blankCard(partner,date){return{id:uid(),name:profile.name||"",partner:partner||"",date:date||today(),updated:Date.now(),answers:{}}}
+function blankCard(partner,date,partnerChapter,partnerProfession){return{id:uid(),name:profile.name||"",partner:partner||"",partnerChapter:partnerChapter||"",partnerProfession:partnerProfession||"",date:date||today(),updated:Date.now(),answers:{}}}
 function load(){
   try{var s=JSON.parse(localStorage.getItem(STORE_KEY)||"null");if(s&&Array.isArray(s.cards))state=s}catch(e){}
   try{var p=JSON.parse(localStorage.getItem(PROFILE_KEY)||"null");if(p)profile=Object.assign(profile,p)}catch(e){}
@@ -306,7 +308,8 @@ function renderHome(){
     var done=cardCompletion(c),wrap=document.createElement("div"),b=document.createElement("button"),del=document.createElement("button");
     wrap.className="recordWrap";
     b.type="button";b.className="record";
-    b.innerHTML='<div class="avatar">'+initials(c.partner)+'</div><div class="recordMain"><div class="recordName">'+escapeHtml(c.partner||"未命名會面")+'</div><div class="recordMeta">'+formatDate(c.date)+(c.name?" · "+escapeHtml(c.name):"")+'</div></div><div class="badge '+(done===9?"done":"")+'">'+(done===9?"已完成":done+"/9")+'</div>';
+    var meta=[c.partnerChapter,c.partnerProfession,formatDate(c.date)].filter(Boolean).map(escapeHtml).join(" · ");
+    b.innerHTML='<div class="avatar">'+initials(c.partner)+'</div><div class="recordMain"><div class="recordName">'+escapeHtml(c.partner||"未命名會面")+'</div><div class="recordMeta">'+meta+'</div></div><div class="badge '+(done===9?"done":"")+'">'+(done===9?"已完成":done+"/9")+'</div>';
     b.addEventListener("click",function(){state.currentId=c.id;if(done===9){renderComplete();show("complete")}else{step=Math.min(firstIncomplete()-1,8);renderConversation();show("conversation")}});
     del.type="button";del.className="deleteRecord";del.setAttribute("aria-label","刪除 "+(c.partner||"呢份記錄"));del.textContent="⌫";
     del.addEventListener("click",function(e){e.stopPropagation();deleteRecordById(c.id)});
@@ -335,7 +338,7 @@ function renderConversation(){
   var c=current();if(!c)return;
   var q=QUESTIONS[step],qnum=step+1;
   el("stepText").textContent=qnum+" / 9";
-  el("partnerEyebrow").textContent=(c.partner||"1-to-1")+" · "+formatDate(c.date);
+  el("partnerEyebrow").textContent=[c.partner||"1-to-1",c.partnerChapter,c.partnerProfession,formatDate(c.date)].filter(Boolean).join(" · ");
   el("questionTitle").textContent=q.zh;el("questionEn").textContent=q.en;renderDots();
   var box=el("answerList");box.innerHTML="";
   indicesFor(qnum,q.pair).forEach(function(i){box.appendChild(makeAnswerRow(qnum,i,q.pair))});
@@ -372,11 +375,11 @@ function addAnswer(){
   if(next>=q.max)el("addAnswerBtn").classList.add("hidden")
 }
 function startNew(){
-  el("newPartner").value="";el("newDate").value=today();show("new");setTimeout(function(){el("newPartner").focus()},150)
+  el("newPartner").value="";el("newPartnerChapter").value="";el("newPartnerProfession").value="";el("newDate").value=today();show("new");setTimeout(function(){el("newPartner").focus()},150)
 }
 function beginMeeting(){
   var partner=el("newPartner").value.trim();if(!partner){el("newPartner").focus();return}
-  var c=blankCard(partner,el("newDate").value||today());state.cards.push(c);state.currentId=c.id;step=0;saveAll(false);renderConversation();show("conversation")
+  var c=blankCard(partner,el("newDate").value||today(),el("newPartnerChapter").value.trim(),el("newPartnerProfession").value.trim());state.cards.push(c);state.currentId=c.id;step=0;saveAll(false);renderConversation();show("conversation")
 }
 function joinAnswers(qnum,labelFallback){
   var q=QUESTIONS[qnum-1],vals=[];
@@ -405,7 +408,7 @@ function renderComplete(){
   var c=current();if(!c)return;
   saveAll(false);
   el("completeTitle").textContent=(c.partner||"今次 1-to-1")+" 完成！";
-  el("completeMeta").textContent=formatDate(c.date)+(profile.chapter?" · "+profile.chapter:"");
+  el("completeMeta").textContent=[c.partnerChapter,c.partnerProfession,formatDate(c.date)].filter(Boolean).join(" · ");
   var box=el("cheatSheet");box.innerHTML="";
   cheatData("zh").forEach(function(x){
     var d=document.createElement("div");d.className="cheatItem";
@@ -433,7 +436,10 @@ function questionShareBlock(qnum,lang){
 function shareCard(){
   var c=current(),lang=outputLang(),mode=shareMode();
   var title=langText("DANCE CARD · "+(c.partner||"1-to-1"),"DANCE CARD · "+(c.partner||"1-to-1"),lang);
-  var lines=[title,langText("日期：","Date: ",lang)+formatDate(c.date),""];
+  var lines=[title];
+  if(c.partnerChapter)lines.push(langText("Chapter：","Chapter: ",lang)+c.partnerChapter);
+  if(c.partnerProfession)lines.push(langText("專業領域：","Profession: ",lang)+c.partnerProfession);
+  lines.push(langText("日期：","Date: ",lang)+formatDate(c.date),"");
   if(mode==="cheat"){
     lines.push(langText("Referral 重點","Referral Cheat Sheet",lang),"");
     cheatData(lang).forEach(function(x){lines.push(x[0]);lines.push("• "+x[1]);lines.push("")});
@@ -468,8 +474,13 @@ function renderPrint(){
   var nameLabel=langText("姓名：","Name: ",lang);
   var withLabel=langText("1-to-1 對象：","one-to-one with ",lang);
   var dateLabel=langText("日期：","on ",lang);
+  var chapterLabel=langText("Chapter：","Chapter: ",lang);
+  var professionLabel=langText("專業領域：","Profession: ",lang);
   var h='<div class="pdf"><div class="pdfTop"><div class="bni">BNI</div><div class="dance">DANCE CARD</div><div></div></div>';
   h+='<div class="who"><b>'+escapeHtml(nameLabel)+'</b> '+escapeHtml(c.name||profile.name)+' &nbsp;&nbsp; <b>'+escapeHtml(withLabel)+'</b> '+escapeHtml(c.partner)+' &nbsp;&nbsp; <b>'+escapeHtml(dateLabel)+'</b> '+escapeHtml(formatDate(c.date))+'</div>';
+  if(c.partnerChapter||c.partnerProfession){
+    h+='<div class="who">'+(c.partnerChapter?'<b>'+escapeHtml(chapterLabel)+'</b> '+escapeHtml(c.partnerChapter)+' &nbsp;&nbsp; ':"")+(c.partnerProfession?'<b>'+escapeHtml(professionLabel)+'</b> '+escapeHtml(c.partnerProfession):"")+'</div>';
+  }
   if(lang==="en"){
     h+='<p class="tips"><b>TIPS:</b> Be respectful of each other’s time, be a good listener, always be positive and give encouragement, stay focused on what you are discussing and, once you have learned this information, work at finding your partner a quality referral.</p>';
   }else if(lang==="bi"){
